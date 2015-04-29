@@ -1,0 +1,91 @@
+create or replace trigger notice_list_trigger
+    AFTER insert ON NL_LIST
+    for each row
+BEGIN
+    insert into NL_MEMBER(
+        MEMBER_ID,
+        TYPE,
+        NL_ACTIVE_EMP_EMPLOYEE_ID,
+        NL_LIST_LIST_SEQ_ID)
+    VALUES (
+        NL_MEMBER_SEQ.nextval,
+        'NOTICE LIST',
+        null,
+        :NEW.LIST_SEQ_ID) ;
+END;
+/
+
+create or replace trigger active_emp_trigger
+    AFTER insert ON NL_ACTIVE_EMP
+    for each row
+BEGIN
+    insert into NL_MEMBER(
+        MEMBER_ID,
+        TYPE,
+        NL_ACTIVE_EMP_EMPLOYEE_ID,
+        NL_LIST_LIST_SEQ_ID)
+    VALUES (
+        NL_ACTIVE_EMP_SEQ.nextval,
+        'ACTIVE EMP',
+        :NEW.EMPLOYEE_ID,
+        null) ;
+END;
+/
+
+create or replace trigger emp_status_trigger
+    BEFORE insert ON NL_ACTIVE_EMP
+    for each row
+BEGIN
+    select 'A', sysdate()
+    into :NEW.STATUS, :NEW.STATUS_EFF_DATE
+    from DUAL;
+END;
+/
+
+create or replace trigger list_status_trigger
+    BEFORE insert ON NL_LIST
+    for each row
+BEGIN
+    select 'A', sysdate()
+    into :NEW.LIST_STATUS, :NEW.STATUS_EFF_DATE
+    from DUAL;
+END;
+/
+
+create or replace function hex_to_decimal
+( p_hex_str in varchar2 ) return number
+is
+v_dec   number;
+v_hex   varchar2(16) := '0123456789ABCDEF';
+begin
+v_dec := 0;
+for indx in 1 .. length(p_hex_str)
+loop
+v_dec := v_dec * 16 + instr(v_hex,upper(substr(p_hex_str,indx,1)))-1;
+end loop;
+return v_dec;
+end hex_to_decimal;
+
+CREATE OR REPLACE FUNCTION getstatus (memberid number)
+RETURN varchar2 IS
+   stat varchar(255) := 0;
+BEGIN
+   SELECT MEMBER_STATUS
+INTO stat
+FROM (
+    (SELECT nl2.LIST_STATUS AS MEMBER_STATUS
+    FROM NL_MEMBER mb2 JOIN NL_LIST nl2
+    ON mb2.NL_LIST_LIST_SEQ_ID = nl2.LIST_SEQ_ID
+    WHERE mb2.MEMBER_ID = memberid)
+
+UNION
+
+(SELECT emp2.STATUS AS MEMBER_STATUS
+    FROM NL_MEMBER mb2 JOIN NL_ACTIVE_EMP emp2
+    ON mb2.NL_ACTIVE_EMP_EMPLOYEE_ID = emp2.EMPLOYEE_ID
+    WHERE mb2.MEMBER_ID = memberid));
+
+   
+   RETURN stat;
+END;
+/
